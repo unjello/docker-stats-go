@@ -64,19 +64,28 @@ func getDockerContainerStats(container DockerContainer) (*DockerStats, error) {
 	return &dockerStats, nil
 }
 
+// Stats .
+type Stats struct {
+	container DockerContainer
+	stats     DockerStats
+}
+
 func main() {
 	// TODO: Add docker-endpoint param
 	// TODO: Add sleep interval param
 	// TODO: Add formatting param
+	quit := make(chan error)
+	done := make(chan int)
+	stat := make(chan Stats)
+
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		os.Exit(1)
+		quit <- fmt.Errorf("SIGTERM Received")
 	}()
 
 	fmt.Println("id, time, inverval")
-	//for {
 
 	dockerContainerList, err := getDockerContainerList()
 	if err != nil {
@@ -84,16 +93,37 @@ func main() {
 		os.Exit(0)
 	}
 
+	dockerMonitors := len(dockerContainerList)
 	for i := 0; i < len(dockerContainerList); i++ {
 		// TODO: Make this a Encoding/Writer
 		fmt.Println(dockerContainerList[i].ID)
-		dockerStats, err := getDockerContainerStats(dockerContainerList[i])
-		if err != nil {
-			// TODO: handle error better
+
+		go func(index int) {
+			dockerStats, err := getDockerContainerStats(dockerContainerList[index])
+			if err != nil {
+				// TODO: handle error better
+				return
+			}
+			stat <- Stats{container: dockerContainerList[index], stats: *dockerStats}
+			done <- index
+		}(i)
+	}
+
+	for {
+		select {
+		case s := <-stat:
+			fmt.Printf("%+v", s)
+
+		case <-done:
+			dockerMonitors--
+			fmt.Printf("Monitor quit. %d Left", dockerMonitors)
+			if dockerMonitors == 0 {
+				os.Exit(0)
+			}
+		case <-quit:
+			// TODO: handle exit with some message?
 			os.Exit(0)
 		}
-		fmt.Printf("%+v", dockerStats)
-
 	}
 	//time.Sleep(time.Duration(10) * time.Millisecond)
 	//}
