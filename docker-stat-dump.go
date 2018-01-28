@@ -85,8 +85,6 @@ func main() {
 		quit <- fmt.Errorf("SIGTERM Received")
 	}()
 
-	fmt.Println("id, time, inverval")
-
 	dockerContainerList, err := getDockerContainerList()
 	if err != nil {
 		// TODO: Fix it to break out of a loop maybe?
@@ -96,8 +94,6 @@ func main() {
 	dockerMonitors := len(dockerContainerList)
 	for i := 0; i < len(dockerContainerList); i++ {
 		// TODO: Make this a Encoding/Writer
-		fmt.Println(dockerContainerList[i].ID)
-
 		go func(index int) {
 			dockerStats, err := getDockerContainerStats(dockerContainerList[index])
 			if err != nil {
@@ -112,11 +108,10 @@ func main() {
 	for {
 		select {
 		case s := <-stat:
-			fmt.Printf("%+v", s)
+			fmt.Printf("%s, %s, %d\n", s.container.ID[:10], s.container.Names[0], s.stats.CPUStats.CPUUsage.TotalUsage)
 
 		case <-done:
 			dockerMonitors--
-			fmt.Printf("Monitor quit. %d Left", dockerMonitors)
 			if dockerMonitors == 0 {
 				os.Exit(0)
 			}
