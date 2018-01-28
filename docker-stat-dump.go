@@ -16,7 +16,7 @@ import (
 )
 
 // TODO: make it a method
-func getDockerContainerStats(context context.Context, client *client.Client, stat *chan Stats, container types.Container) error {
+func getDockerContainerStats(context context.Context, client *client.Client, stat chan<- Stats, container types.Container) error {
 	// TODO: test for missing container
 	response, err := client.ContainerStats(context, container.ID, true)
 	if err != nil {
@@ -31,7 +31,7 @@ func getDockerContainerStats(context context.Context, client *client.Client, sta
 		}
 		var dockerStats types.Stats
 		json.Unmarshal(line, &dockerStats)
-		*stat <- Stats{container: container, stats: dockerStats}
+		stat <- Stats{container: container, stats: dockerStats}
 	}
 }
 
@@ -71,7 +71,7 @@ func main() {
 	for i := 0; i < len(dockerContainerList); i++ {
 		// TODO: Make this a Encoding/Writer
 		go func(index int) {
-			err := getDockerContainerStats(context.Background(), cli, &stat, dockerContainerList[index])
+			err := getDockerContainerStats(context.Background(), cli, stat, dockerContainerList[index])
 			if err != nil {
 				done <- dockerContainerList[index].ID
 			}
