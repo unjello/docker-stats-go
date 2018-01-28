@@ -3,22 +3,26 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
-var dockerAPIEndpoint = `127.0.0.1:2375`
+// TODO: make it a method
+func getDockerContainerStats(context context.Context, client *client.Client, container types.Container) (*types.Stats, error) {
+	// FIXME: do proper streaming
 
-func getResponseBody(url string) ([]byte, error) {
-	response, err := http.Get(url)
+	// TODO: test for missing container
+	response, err := client.ContainerStats(context, container.ID, false)
 	if err != nil {
-		log.Fatal(err.Error())
 		return nil, err
 	}
 
@@ -28,46 +32,15 @@ func getResponseBody(url string) ([]byte, error) {
 		return nil, err
 	}
 
-	return responseData, nil
-}
-
-// TODO: make it a method
-func getDockerContainerList() ([]DockerContainer, error) {
-	url := fmt.Sprintf("http://%s/containers/json", dockerAPIEndpoint)
-
-	response, err := getResponseBody(url)
-	if err != nil {
-		return nil, err
-	}
-
-	// top level array trick goes to
-	// https://coderwall.com/p/4c2zig/decode-top-level-json-array-into-a-slice-of-structs-in-golang
-	dockerContainersList := make([]DockerContainer, 0)
-	json.Unmarshal(response, &dockerContainersList)
-
-	return dockerContainersList, nil
-}
-
-// TODO: make it a method
-func getDockerContainerStats(container DockerContainer) (*DockerStats, error) {
-	// FIXME: do proper streaming
-	url := fmt.Sprintf("http://%s/containers/%s/stats?stream=false", dockerAPIEndpoint, container.ID)
-
-	// TODO: test for missing container
-	response, err := getResponseBody(url)
-	if err != nil {
-		return nil, err
-	}
-
-	var dockerStats DockerStats
-	json.Unmarshal(response, &dockerStats)
+	var dockerStats types.Stats
+	json.Unmarshal(responseData, &dockerStats)
 	return &dockerStats, nil
 }
 
 // Stats .
 type Stats struct {
-	container DockerContainer
-	stats     DockerStats
+	container types.Container
+	stats     types.Stats
 }
 
 func main() {
@@ -85,7 +58,12 @@ func main() {
 		quit <- fmt.Errorf("SIGTERM Received")
 	}()
 
-	dockerContainerList, err := getDockerContainerList()
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		panic(err)
+	}
+
+	dockerContainerList, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
 		// TODO: Fix it to break out of a loop maybe?
 		os.Exit(0)
@@ -95,7 +73,7 @@ func main() {
 	for i := 0; i < len(dockerContainerList); i++ {
 		// TODO: Make this a Encoding/Writer
 		go func(index int) {
-			dockerStats, err := getDockerContainerStats(dockerContainerList[index])
+			dockerStats, err := getDockerContainerStats(context.Background(), cli, dockerContainerList[index])
 			if err != nil {
 				// TODO: handle error better
 				return
