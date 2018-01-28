@@ -3,11 +3,10 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,24 +16,23 @@ import (
 )
 
 // TODO: make it a method
-func getDockerContainerStats(context context.Context, client *client.Client, container types.Container) (*types.Stats, error) {
-	// FIXME: do proper streaming
-
+func getDockerContainerStats(context context.Context, client *client.Client, stat *chan Stats, container types.Container) error {
 	// TODO: test for missing container
-	response, err := client.ContainerStats(context, container.ID, false)
+	response, err := client.ContainerStats(context, container.ID, true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
+	reader := bufio.NewReader(response.Body)
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			return fmt.Errorf("Stream finished")
+		}
+		var dockerStats types.Stats
+		json.Unmarshal(line, &dockerStats)
+		*stat <- Stats{container: container, stats: dockerStats}
 	}
-
-	var dockerStats types.Stats
-	json.Unmarshal(responseData, &dockerStats)
-	return &dockerStats, nil
 }
 
 // Stats .
@@ -48,7 +46,7 @@ func main() {
 	// TODO: Add sleep interval param
 	// TODO: Add formatting param
 	quit := make(chan error)
-	done := make(chan int)
+	done := make(chan string)
 	stat := make(chan Stats)
 
 	c := make(chan os.Signal, 2)
@@ -73,13 +71,10 @@ func main() {
 	for i := 0; i < len(dockerContainerList); i++ {
 		// TODO: Make this a Encoding/Writer
 		go func(index int) {
-			dockerStats, err := getDockerContainerStats(context.Background(), cli, dockerContainerList[index])
+			err := getDockerContainerStats(context.Background(), cli, &stat, dockerContainerList[index])
 			if err != nil {
-				// TODO: handle error better
-				return
+				done <- dockerContainerList[index].ID
 			}
-			stat <- Stats{container: dockerContainerList[index], stats: *dockerStats}
-			done <- index
 		}(i)
 	}
 
