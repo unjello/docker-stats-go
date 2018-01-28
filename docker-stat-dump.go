@@ -113,7 +113,9 @@ func main() {
 		case <-done:
 			dockerMonitors--
 			if dockerMonitors == 0 {
-				os.Exit(0)
+				go func() {
+					quit <- fmt.Errorf("No monitors left")
+				}()
 			}
 		case <-quit:
 			// TODO: handle exit with some message?
