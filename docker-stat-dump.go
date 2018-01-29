@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-units"
 )
 
 // TODO: make it a method
@@ -31,7 +32,7 @@ func getDockerContainerStats(context context.Context, client *client.Client, sta
 		}
 		var dockerStats types.Stats
 		json.Unmarshal(line, &dockerStats)
-		stat <- Stats{container: container, stats: dockerStats}
+		stat <- Stats{container: container, stats: dockerStats, os: response.OSType}
 	}
 }
 
@@ -39,6 +40,18 @@ func getDockerContainerStats(context context.Context, client *client.Client, sta
 type Stats struct {
 	container types.Container
 	stats     types.Stats
+	os        string
+}
+
+type CalculatedStats struct {
+	ID               string
+	Name             string
+	CpuPercentage    float64
+	Memory           float64
+	MemoryLimit      float64
+	MemoryPercentage float64
+	NetworkRx        float64
+	NetworkTx        float64
 }
 
 func main() {
@@ -81,7 +94,15 @@ func main() {
 	for {
 		select {
 		case s := <-stat:
-			fmt.Printf("%s, %s, %d\n", s.container.ID[:10], s.container.Names[0], s.stats.CPUStats.CPUUsage.TotalUsage)
+			cs := CalculatedStats{
+				ID:               s.container.ID,
+				Name:             s.container.Names[0],
+				CpuPercentage:    CalculateCPUPercentage(s.os, s.stats),
+				Memory:           CalculateMemoryUsage(s.os, s.stats),
+				MemoryLimit:      CalculateMemoryLimit(s.os, s.stats),
+				MemoryPercentage: CalculateMemoryPercentage(s.os, s.stats),
+			}
+			fmt.Printf("%s, %s, %s, cpu: %.2f mem: %.2f, mib: %s, limit: %s\n", s.os, cs.ID[:10], cs.Name, cs.CpuPercentage, cs.MemoryPercentage, units.BytesSize(cs.Memory), units.BytesSize(cs.MemoryLimit))
 
 		case <-done:
 			dockerMonitors--
