@@ -4,7 +4,23 @@
 
 ## How does it work?
 
-- It connects to HTTP API and polls the information directly from the engine.
+- It connects to HTTP API and polls the information directly from the engine, using official Docker Client.
+
+## Known issues
+
+- The tool is built agains latest stable SDK. If you're running docker from experimental channel, you may need to narrow down API version, by setting `DOCKER_API_VERSION` environment variable:
+
+  Windows:
+
+  ```powershell
+  PS C:\$env:DOCKER_API_VERSION="1.35"
+  ```
+
+  Linux/macOS:
+
+  ```bash
+  export DOCKER_API_VERSION="1.35"
+  ```
 
 ## License
 
