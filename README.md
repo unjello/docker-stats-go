@@ -13,7 +13,7 @@
   Windows:
 
   ```powershell
-  PS C:\$env:DOCKER_API_VERSION="1.35"
+  $env:DOCKER_API_VERSION="1.35"
   ```
 
   Linux/macOS:
