@@ -5,15 +5,16 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/docker/go-units"
 )
 
 // TODO: make it a method
@@ -44,14 +45,31 @@ type Stats struct {
 }
 
 type CalculatedStats struct {
+	OS               string
 	ID               string
 	Name             string
 	CpuPercentage    float64
 	Memory           float64
 	MemoryLimit      float64
 	MemoryPercentage float64
-	NetworkRx        float64
-	NetworkTx        float64
+}
+
+func (cs *CalculatedStats) Strings() []string {
+	var t []string
+
+	t = append(t, cs.OS)
+	t = append(t, cs.ID[:10])
+	t = append(t, strings.TrimLeft(cs.Name, "/"))
+	t = append(t, fmt.Sprintf("%.2f", cs.CpuPercentage))
+	t = append(t, fmt.Sprintf("%.2f", cs.Memory))
+	t = append(t, fmt.Sprintf("%.2f", cs.MemoryLimit))
+	t = append(t, fmt.Sprintf("%.2f", cs.MemoryPercentage))
+
+	return t
+}
+
+func Header() []string {
+	return []string{"os", "id", "name", "cpup", "musage", "mlimit", "memp"}
 }
 
 func main() {
@@ -82,7 +100,6 @@ func main() {
 
 	dockerMonitors := len(dockerContainerList)
 	for i := 0; i < len(dockerContainerList); i++ {
-		// TODO: Make this a Encoding/Writer
 		go func(index int) {
 			err := getDockerContainerStats(context.Background(), cli, stat, dockerContainerList[index])
 			if err != nil {
@@ -91,10 +108,15 @@ func main() {
 		}(i)
 	}
 
+	writer := csv.NewWriter(os.Stdout)
+	writer.Write(Header())
+	writer.Flush()
+
 	for {
 		select {
 		case s := <-stat:
 			cs := CalculatedStats{
+				OS:               s.os,
 				ID:               s.container.ID,
 				Name:             s.container.Names[0],
 				CpuPercentage:    CalculateCPUPercentage(s.os, s.stats),
@@ -102,7 +124,13 @@ func main() {
 				MemoryLimit:      CalculateMemoryLimit(s.os, s.stats),
 				MemoryPercentage: CalculateMemoryPercentage(s.os, s.stats),
 			}
-			fmt.Printf("%s, %s, %s, cpu: %.2f mem: %.2f, mib: %s, limit: %s\n", s.os, cs.ID[:10], cs.Name, cs.CpuPercentage, cs.MemoryPercentage, units.BytesSize(cs.Memory), units.BytesSize(cs.MemoryLimit))
+			err := writer.Write(cs.Strings())
+			writer.Flush()
+
+			if err != nil {
+				fmt.Println(err)
+			}
+			//fmt.Printf("%s, %s, %s, cpu: %.2f mem: %.2f, mib: %s, limit: %s\n", s.os, cs.ID[:10], cs.Name, cs.CpuPercentage, cs.MemoryPercentage, units.BytesSize(cs.Memory), units.BytesSize(cs.MemoryLimit))
 
 		case <-done:
 			dockerMonitors--
