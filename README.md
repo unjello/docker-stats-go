@@ -4,7 +4,7 @@
 
 # docker-stats
 
-- _docker-stats_ is a tiny cli tool for dumping docker-stats info as text, csv or json.
+- _docker-stats_ is a tiny cli tool for dumping docker-stats info as text, csv (*text/csv; header=present*) or json (*application/json*).
 
 ## How does it work?
 
