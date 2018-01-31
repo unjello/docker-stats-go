@@ -15,6 +15,8 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-units"
+	flag "github.com/spf13/pflag"
 )
 
 // TODO: make it a method
@@ -48,31 +50,53 @@ type CalculatedStats struct {
 	OS               string
 	ID               string
 	Name             string
+	Image            string
 	CpuPercentage    float64
 	Memory           float64
 	MemoryLimit      float64
 	MemoryPercentage float64
 }
 
-func (cs *CalculatedStats) Strings() []string {
+func (cs *CalculatedStats) Strings(isHumanReadable bool) []string {
 	var t []string
 
 	t = append(t, cs.OS)
 	t = append(t, cs.ID[:10])
 	t = append(t, strings.TrimLeft(cs.Name, "/"))
-	t = append(t, fmt.Sprintf("%.2f", cs.CpuPercentage))
-	t = append(t, fmt.Sprintf("%.2f", cs.Memory))
-	t = append(t, fmt.Sprintf("%.2f", cs.MemoryLimit))
-	t = append(t, fmt.Sprintf("%.2f", cs.MemoryPercentage))
+	t = append(t, cs.Image)
+	if isHumanReadable {
+		t = append(t, fmt.Sprintf("%.2f%%", cs.CpuPercentage))
+		t = append(t, units.BytesSize(cs.Memory))
+		t = append(t, units.BytesSize(cs.MemoryLimit))
+		t = append(t, fmt.Sprintf("%.2f%%", cs.MemoryPercentage))
+	} else {
+		t = append(t, fmt.Sprintf("%.2f", cs.CpuPercentage))
+		t = append(t, fmt.Sprintf("%.2f", cs.Memory))
+		t = append(t, fmt.Sprintf("%.2f", cs.MemoryLimit))
+		t = append(t, fmt.Sprintf("%.2f", cs.MemoryPercentage))
+	}
 
 	return t
 }
 
 func Header() []string {
-	return []string{"os", "id", "name", "cpup", "musage", "mlimit", "memp"}
+	return []string{"os", "id", "name", "image", "cpup", "musage", "mlimit", "memp"}
+}
+
+type Options struct {
+	IsHumanReadable bool
+}
+
+func (o *Options) Init() {
+	flag.BoolVarP(&o.IsHumanReadable, "human-readable", "h", false, "output size numbers in IEC format")
 }
 
 func main() {
+
+	var options Options
+	options.Init()
+	flag.Parse()
+
 	// TODO: Add docker-endpoint param
 	// TODO: Add sleep interval param
 	// TODO: Add formatting param
@@ -119,12 +143,13 @@ func main() {
 				OS:               s.os,
 				ID:               s.container.ID,
 				Name:             s.container.Names[0],
+				Image:            s.container.Image,
 				CpuPercentage:    CalculateCPUPercentage(s.os, s.stats),
 				Memory:           CalculateMemoryUsage(s.os, s.stats),
 				MemoryLimit:      CalculateMemoryLimit(s.os, s.stats),
 				MemoryPercentage: CalculateMemoryPercentage(s.os, s.stats),
 			}
-			err := writer.Write(cs.Strings())
+			err := writer.Write(cs.Strings(options.IsHumanReadable))
 			writer.Flush()
 
 			if err != nil {
