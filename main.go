@@ -91,7 +91,7 @@ type Options struct {
 
 func (o *Options) Init() {
 	flag.BoolVarP(&o.IsHumanReadable, "human-readable", "h", false, "output size numbers in IEC format")
-	flag.StringVarP(&o.Format, "format", "f", "table", "format for results: table (default), csv")
+	flag.StringVarP(&o.Format, "format", "f", "table", "format for results: table (default), csv, json")
 }
 
 func (o *Options) Parse() {
@@ -100,6 +100,7 @@ func (o *Options) Parse() {
 	switch o.Format {
 	case "table":
 	case "csv":
+	case "json":
 	default:
 		flag.PrintDefaults()
 		os.Exit(0)
@@ -107,7 +108,8 @@ func (o *Options) Parse() {
 }
 
 type Writer interface {
-	Write(record []string) error
+	Write(record CalculatedStats, isHumanReadable bool) error
+	WriteS(record []string) error
 	Flush()
 }
 
@@ -119,12 +121,52 @@ func NewTableWriter(w io.Writer) *TableWriter {
 	return &TableWriter{w}
 }
 
-func (w *TableWriter) Write(record []string) error {
+func (w *TableWriter) Write(record CalculatedStats, isHumanReadable bool) error {
+	return w.WriteS(record.Strings(isHumanReadable))
+}
+
+func (w *TableWriter) WriteS(record []string) error {
 	_, err := w.w.Write([]byte(fmt.Sprintln(strings.Join(record, "\t"))))
 	return err
 }
 
 func (w *TableWriter) Flush() {}
+
+type JsonWriter struct {
+	w *json.Encoder
+}
+
+func NewJsonWriter(w *json.Encoder) *JsonWriter {
+	return &JsonWriter{w}
+}
+
+func (w *JsonWriter) Write(record CalculatedStats, isHumanReadable bool) error {
+	return w.w.Encode(record)
+}
+func (w *JsonWriter) WriteS(record []string) error {
+	return nil
+}
+func (w *JsonWriter) Flush() {}
+
+type CsvWriter struct {
+	w *csv.Writer
+}
+
+func NewCsvWriter(w *csv.Writer) *CsvWriter {
+	return &CsvWriter{w}
+}
+
+func (w *CsvWriter) Write(record CalculatedStats, isHumanReadable bool) error {
+	return w.WriteS(record.Strings(isHumanReadable))
+}
+
+func (w *CsvWriter) WriteS(record []string) error {
+	return w.w.Write(record)
+}
+
+func (w *CsvWriter) Flush() {
+	w.w.Flush()
+}
 
 func main() {
 
@@ -169,12 +211,14 @@ func main() {
 	var writer Writer
 	switch options.Format {
 	case "csv":
-		writer = csv.NewWriter(os.Stdout)
+		writer = NewCsvWriter(csv.NewWriter(os.Stdout))
+	case "json":
+		writer = NewJsonWriter(json.NewEncoder(os.Stdout))
 	default:
 		writer = NewTableWriter(os.Stdout)
 	}
 
-	writer.Write(Header())
+	writer.WriteS(Header())
 	writer.Flush()
 
 	for {
@@ -190,7 +234,7 @@ func main() {
 				MemoryLimit:      CalculateMemoryLimit(s.os, s.stats),
 				MemoryPercentage: CalculateMemoryPercentage(s.os, s.stats),
 			}
-			err := writer.Write(cs.Strings(options.IsHumanReadable))
+			err := writer.Write(cs, options.IsHumanReadable)
 			writer.Flush()
 
 			if err != nil {
