@@ -20,9 +20,7 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-// TODO: make it a method
 func getDockerContainerStats(context context.Context, client *client.Client, stat chan<- Stats, container types.Container) error {
-	// TODO: test for missing container
 	response, err := client.ContainerStats(context, container.ID, true)
 	if err != nil {
 		return err
@@ -169,13 +167,10 @@ func (w *CsvWriter) Flush() {
 }
 
 func main() {
-
 	var options Options
 	options.Init()
 	options.Parse()
 
-	// TODO: Add docker-endpoint param
-	// TODO: Add sleep interval param
 	quit := make(chan error)
 	done := make(chan string)
 	stat := make(chan Stats)
@@ -249,6 +244,4 @@ func main() {
 			os.Exit(0)
 		}
 	}
-	//time.Sleep(time.Duration(10) * time.Millisecond)
-	//}
 }
