@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/unjello/docker-stats-go.svg?branch=master)](https://travis-ci.org/unjello/docker-stats-go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/unjello/docker-stats-go)](https://goreportcard.com/report/github.com/docker-stats-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/unjello/docker-stats-go)](https://goreportcard.com/report/github.com/unjello/docker-stats-go)
 [![GoDoc](https://godoc.org/github.com/unjello/docker-stats-go?status.svg)](https://godoc.org/github.com/unjello/docker-stats-go)
 
 # docker-stats
