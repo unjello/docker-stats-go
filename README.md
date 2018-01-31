@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/unjello/docker-stats-go.svg?branch=master)](https://travis-ci.org/unjello/docker-stats-go)
+
 # docker-stats
 
 - _docker-stats_ is a tiny cli tool for dumping docker-stats info as text, csv or json.
