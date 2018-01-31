@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/unjello/docker-stats-go.svg?branch=master)](https://travis-ci.org/unjello/docker-stats-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/unjello/docker-stats-go)](https://goreportcard.com/report/github.com/docker-stats-go)
 
 # docker-stats
 
