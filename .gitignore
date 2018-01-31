@@ -15,3 +15,9 @@
 
 # IDE-related files
 .vscode/
+
+# Executable
+docker-stats-go
+docker-stats-go.exe
+debug
+debug.exe
