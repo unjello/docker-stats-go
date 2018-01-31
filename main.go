@@ -194,8 +194,7 @@ func main() {
 
 	dockerContainerList, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
-		// TODO: Fix it to break out of a loop maybe?
-		os.Exit(0)
+		panic(err)
 	}
 
 	dockerMonitors := len(dockerContainerList)
@@ -235,11 +234,10 @@ func main() {
 				MemoryPercentage: CalculateMemoryPercentage(s.os, s.stats),
 			}
 			err := writer.Write(cs, options.IsHumanReadable)
-			writer.Flush()
-
 			if err != nil {
-				fmt.Println(err)
+				panic(err)
 			}
+			writer.Flush()
 		case <-done:
 			dockerMonitors--
 			if dockerMonitors == 0 {
@@ -248,7 +246,6 @@ func main() {
 				}()
 			}
 		case <-quit:
-			// TODO: handle exit with some message?
 			os.Exit(0)
 		}
 	}
