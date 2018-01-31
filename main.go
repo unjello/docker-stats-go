@@ -8,6 +8,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -85,21 +86,54 @@ func Header() []string {
 
 type Options struct {
 	IsHumanReadable bool
+	Format          string
 }
 
 func (o *Options) Init() {
 	flag.BoolVarP(&o.IsHumanReadable, "human-readable", "h", false, "output size numbers in IEC format")
+	flag.StringVarP(&o.Format, "format", "f", "table", "format for results: table (default), csv")
 }
+
+func (o *Options) Parse() {
+	flag.Parse()
+
+	switch o.Format {
+	case "table":
+	case "csv":
+	default:
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+}
+
+type Writer interface {
+	Write(record []string) error
+	Flush()
+}
+
+type TableWriter struct {
+	w io.Writer
+}
+
+func NewTableWriter(w io.Writer) *TableWriter {
+	return &TableWriter{w}
+}
+
+func (w *TableWriter) Write(record []string) error {
+	_, err := w.w.Write([]byte(fmt.Sprintln(strings.Join(record, "\t"))))
+	return err
+}
+
+func (w *TableWriter) Flush() {}
 
 func main() {
 
 	var options Options
 	options.Init()
-	flag.Parse()
+	options.Parse()
 
 	// TODO: Add docker-endpoint param
 	// TODO: Add sleep interval param
-	// TODO: Add formatting param
 	quit := make(chan error)
 	done := make(chan string)
 	stat := make(chan Stats)
@@ -132,7 +166,14 @@ func main() {
 		}(i)
 	}
 
-	writer := csv.NewWriter(os.Stdout)
+	var writer Writer
+	switch options.Format {
+	case "csv":
+		writer = csv.NewWriter(os.Stdout)
+	default:
+		writer = NewTableWriter(os.Stdout)
+	}
+
 	writer.Write(Header())
 	writer.Flush()
 
@@ -155,8 +196,6 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			}
-			//fmt.Printf("%s, %s, %s, cpu: %.2f mem: %.2f, mib: %s, limit: %s\n", s.os, cs.ID[:10], cs.Name, cs.CpuPercentage, cs.MemoryPercentage, units.BytesSize(cs.Memory), units.BytesSize(cs.MemoryLimit))
-
 		case <-done:
 			dockerMonitors--
 			if dockerMonitors == 0 {
