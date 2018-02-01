@@ -8,11 +8,11 @@
 
 ## How does it work?
 
-- It connects to HTTP API and polls the information directly from the engine, using official Docker Client.
+- It connects to Docker API (either TCP or pipe) and polls the information directly from the engine, using official Docker Client.
 
 ## Known issues
 
-- The tool is built agains latest stable SDK. If you're running docker from experimental channel, you may need to narrow down API version, by setting `DOCKER_API_VERSION` environment variable:
+- The tool is built against latest stable SDK. If you're running docker from experimental channel, you may need to narrow down API version, by setting `DOCKER_API_VERSION` environment variable:
 
   Windows:
 
