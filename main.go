@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"text/template"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -83,8 +84,9 @@ func Header() []string {
 }
 
 type Options struct {
-	IsHumanReadable bool
-	Format          string
+	IsHumanReadable  bool
+	Format           string
+	CompiledTemplate *template.Template
 }
 
 func (o *Options) Init() {
@@ -100,8 +102,13 @@ func (o *Options) Parse() {
 	case "csv":
 	case "json":
 	default:
-		flag.PrintDefaults()
-		os.Exit(0)
+		var err error
+		o.CompiledTemplate, err = template.New("format").Parse(o.Format)
+		if err != nil {
+			flag.PrintDefaults()
+			fmt.Println("Invalid Go template: ", err)
+			os.Exit(0)
+		}
 	}
 }
 
@@ -203,21 +210,30 @@ func main() {
 	}
 
 	var writer Writer
+	var template bool = false
 	switch options.Format {
 	case "csv":
 		writer = NewCsvWriter(csv.NewWriter(os.Stdout))
 	case "json":
 		writer = NewJsonWriter(json.NewEncoder(os.Stdout))
-	default:
+	case "table":
 		writer = NewTableWriter(os.Stdout)
+	default:
+		template = true
 	}
 
-	writer.WriteS(Header())
-	writer.Flush()
+	if template {
+	} else {
+		writer.WriteS(Header())
+		writer.Flush()
+	}
 
 	for {
 		select {
 		case s := <-stat:
+			// TODO: Add shortened ID to the structure, so CSV output can be done as fixed template
+			// TODO: Trim Image in structure to use Go templates directly
+			// TODO: Move human readable inside structure as method
 			cs := CalculatedStats{
 				OS:               s.os,
 				ID:               s.container.ID,
@@ -228,11 +244,19 @@ func main() {
 				MemoryLimit:      CalculateMemoryLimit(s.os, s.stats),
 				MemoryPercentage: CalculateMemoryPercentage(s.os, s.stats),
 			}
-			err := writer.Write(cs, options.IsHumanReadable)
+			var err error
+			if template {
+				err = options.CompiledTemplate.Execute(os.Stdout, cs)
+				os.Stdout.WriteString("\n")
+			} else {
+				err = writer.Write(cs, options.IsHumanReadable)
+			}
 			if err != nil {
 				panic(err)
 			}
-			writer.Flush()
+			if template == false {
+				writer.Flush()
+			}
 		case <-done:
 			dockerMonitors--
 			if dockerMonitors == 0 {
